@@ -1,0 +1,228 @@
+SimpleXMLElement Object
+(
+    [@attributes] => Array
+        (
+            [version] => 3.0
+        )
+
+    [titleInfo] => Array
+        (
+            [0] => SimpleXMLElement Object
+                (
+                    [nonSort] => The 
+                    [title] => okay witch
+                )
+
+            [1] => SimpleXMLElement Object
+                (
+                    [@attributes] => Array
+                        (
+                            [type] => alternative
+                        )
+
+                    [title] => OK witch
+                )
+
+        )
+
+    [name] => SimpleXMLElement Object
+        (
+            [@attributes] => Array
+                (
+                    [type] => personal
+                )
+
+            [namePart] => Steinkellner, Emma
+            [role] => Array
+                (
+                    [0] => SimpleXMLElement Object
+                        (
+                            [roleTerm] => creator
+                        )
+
+                    [1] => SimpleXMLElement Object
+                        (
+                            [roleTerm] => author,
+                        )
+
+                    [2] => SimpleXMLElement Object
+                        (
+                            [roleTerm] => artist.
+                        )
+
+                )
+
+        )
+
+    [typeOfResource] => text
+    [genre] => Array
+        (
+            [0] => Paranormal comics.
+            [1] => Graphic novels.
+        )
+
+    [originInfo] => SimpleXMLElement Object
+        (
+            [place] => SimpleXMLElement Object
+                (
+                    [placeTerm] => nyu
+                )
+
+            [dateIssued] => 2019
+            [edition] => First Aladdin edition.
+            [issuance] => monographic
+        )
+
+    [language] => SimpleXMLElement Object
+        (
+            [languageTerm] => eng
+        )
+
+    [physicalDescription] => SimpleXMLElement Object
+        (
+            [form] => print
+            [extent] => 271 pages : color illustrations ; 22 cm
+        )
+
+    [abstract] => "Thirteen-year-old Moth Hush loves all things witchy. But she's about to discover that witches aren't just the stuff of movies, books, and spooky stories. When some eighth-grade bullies try to ruin her Halloween, something really strange happens. It turns out that Founder's Bluff, Massachusetts, has a centuries-old history of witch drama. And, surprise: Moth's family is at the center of it all! When Moth's new powers show up, things get totally out-of-control. She meets a talking cat, falls into an enchanted diary, and unlocks a hidden witch world. Secrets surface from generations past as Moth unravels the complicated legacy at the heart of her town, her family, and herself."--Amazon.
+    [targetAudience] => Array
+        (
+            [0] => Ages 8-12.
+            [1] => juvenile
+        )
+
+    [note] => Array
+        (
+            [0] => by Emma Steinkellner.
+            [1] => Chiefly illustrations.
+        )
+
+    [subject] => Array
+        (
+            [0] => SimpleXMLElement Object
+                (
+                    [@attributes] => Array
+                        (
+                            [authority] => lcsh
+                        )
+
+                    [topic] => Array
+                        (
+                            [0] => Teenage girls
+                            [1] => Comic books, strips, etc
+                        )
+
+                )
+
+            [1] => SimpleXMLElement Object
+                (
+                    [@attributes] => Array
+                        (
+                            [authority] => lcsh
+                        )
+
+                    [topic] => Array
+                        (
+                            [0] => Family secrets
+                            [1] => Comic books, strips, etc
+                        )
+
+                )
+
+            [2] => SimpleXMLElement Object
+                (
+                    [@attributes] => Array
+                        (
+                            [authority] => lcsh
+                        )
+
+                    [topic] => Array
+                        (
+                            [0] => Witches
+                            [1] => Comic books, strips, etc
+                        )
+
+                )
+
+            [3] => SimpleXMLElement Object
+                (
+                    [@attributes] => Array
+                        (
+                            [authority] => lcsh
+                        )
+
+                    [topic] => Array
+                        (
+                            [0] => Magic
+                            [1] => Comic books, strips, etc
+                        )
+
+                )
+
+            [4] => SimpleXMLElement Object
+                (
+                    [@attributes] => Array
+                        (
+                            [authority] => lcsh
+                        )
+
+                    [topic] => Array
+                        (
+                            [0] => Halloween
+                            [1] => Comic books, strips, etc
+                        )
+
+                )
+
+            [5] => SimpleXMLElement Object
+                (
+                    [@attributes] => Array
+                        (
+                            [authority] => lcsh
+                        )
+
+                    [topic] => Array
+                        (
+                            [0] => Mothers and daughters
+                            [1] => Comic books, strips, etc
+                        )
+
+                )
+
+            [6] => SimpleXMLElement Object
+                (
+                    [@attributes] => Array
+                        (
+                            [authority] => lcsh
+                        )
+
+                    [geographic] => Massachusetts
+                    [topic] => Comic books, strips, etc
+                )
+
+        )
+
+    [classification] => 741.5/973
+    [identifier] => Array
+        (
+            [0] => 9781534431461
+            [1] => 1534431462
+            [2] => 9781534431454
+            [3] => 1534431454
+            [4] => 2018960169
+        )
+
+    [recordInfo] => SimpleXMLElement Object
+        (
+            [recordContentSource] => NjBwBT
+            [recordCreationDate] => 190822
+            [recordChangeDate] => 20190924202607.0
+            [recordIdentifier] => 11578380
+            [languageOfCataloging] => SimpleXMLElement Object
+                (
+                    [languageTerm] => eng
+                )
+
+        )
+
+)

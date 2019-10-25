@@ -1,0 +1,12 @@
+name: Catalog Importer Module
+description: Provides custom import functionality for Fontanalib.
+package: Custom
+type: module
+version: 1.0
+core: 8.x
+dependencies:
+  - drupal:migrate
+  - drupal:migrate_plus
+  - drupal:feeds
+  - options
+  - entity_reference

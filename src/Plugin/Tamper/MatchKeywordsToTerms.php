@@ -96,8 +96,9 @@ class MatchKeywordsToTerms extends TamperBase {
     foreach($terms as $term){
       $counts[$term] = 0;
     }
+    $add = array_intersect($terms, $audiences);
     $check = array_diff($audiences, $terms);
-    $audiences = array_merge($audiences, $this->checkAudienceKeywords($check, $terms));
+    $audiences = array_merge($add, $this->checkAudienceKeywords($check, $terms));
     
 
     foreach($audiences as $k => $aud){
@@ -108,7 +109,6 @@ class MatchKeywordsToTerms extends TamperBase {
     
     $check = $counts;
     $check = array_unique(array_values($check));
-    
 
     if(count($check) > 1){
       arsort($counts);
@@ -136,6 +136,7 @@ class MatchKeywordsToTerms extends TamperBase {
     foreach ($data as $keyword){
       $terms[] = $this->lookupTerm($keyword, $vid);
     }
+
     return array_filter($terms);
   }
 /**
@@ -236,12 +237,21 @@ class MatchKeywordsToTerms extends TamperBase {
       }
     }
     
+    
     arsort($count);
-    array_shift($count);
+    $check = $count;
+    $check = array_unique(array_values($check));
 
-    foreach($count as $parent => $num){
-      $remove = array_merge($remove, $this->search['genre']['terms']['tree'][$parent]);
+    if($count['fiction'] == $count['nonfiction'] && ($count['fiction'] > 0 || $count['nonfiction'] > 0)){
+      //do nothing?
+    } elseif(count(array_filter($check)) >= 1) {
+      array_shift($count);
+      foreach($count as $parent => $num){
+        $remove = array_merge($remove, $this->search['genre']['terms']['tree'][$parent]);
+        $remove[]=$parent;
+      }
     }
+    
     $genres = array_unique(array_merge($keywords, $add));
 
     return array_diff($genres, $remove);
@@ -285,21 +295,35 @@ class MatchKeywordsToTerms extends TamperBase {
           $array[] =  "young adult";
       } elseif (substr($checkValue,0,5) === 'adult' || $checkValue === "general"){
         $array[] =  "adult";
-      } elseif (strpos($checkValue, 'grade') !== FALSE || substr($checkValue,0,3) === 'age' || strpos($checkValue, ' ages ') !== FALSE || strpos($checkValue, 'and up') !== FALSE || substr($checkValue,0,6) === 'infant' || substr($checkValue,0,4) === 'k to' || preg_match('/^[0-9]+(-[0-9]+)+$/', $checkValue) || strpos($checkValue, 'lexile') !== FALSE ){
+      } elseif (strpos($checkValue, 'grade') !== FALSE ||
+                substr($checkValue,0,3) === 'age' ||
+                strpos($checkValue, ' ages ') !== FALSE ||
+                strpos($checkValue, 'and up') !== FALSE ||
+                substr($checkValue,0,6) === 'infant' ||
+                substr($checkValue,0,4) === 'k to' ||
+                preg_match('/^[0-9]+(-[0-9]+)+$/', $checkValue) ||
+                strpos($checkValue, 'lexile') !== FALSE ){
         $array[] = "juvenile";
       } elseif (strpos($checkValue, 'young adult') !== FALSE||
               strpos($checkValue, 'teen') !== FALSE ||
               strpos($checkValue, 'higher education') !== FALSE ||
               strpos($checkValue, 'rated t') !== FALSE ){
         $array[] = "young adult";
-      } elseif (strpos($checkValue, 'rated g') !== FALSE || strpos($checkValue, 'rating: g') !== FALSE){
+      } elseif (strpos($checkValue, 'rated g') !== FALSE ||
+                strpos($checkValue, 'rating: g') !== FALSE){
         $array[] = "juvenile";
-      } elseif (strpos($checkValue, 'adult') !== FALSE || (strpos($checkValue, 'rating: r') !== FALSE || strpos($checkValue, 'rating: pg-13') !== FALSE || strpos($checkValue, 'rating: pg') !== FALSE || strpos($checkValue, 'rated r') !== FALSE || strpos($checkValue, 'rated pg') !== FALSE || !strpos($checkValue, 'not rated') !== FALSE)){
+      } elseif (strpos($checkValue, 'adult') !== FALSE ||
+                strpos($checkValue, 'rating: r') !== FALSE ||
+                strpos($checkValue, 'rating: pg-13') !== FALSE ||
+                strpos($checkValue, 'rated r') !== FALSE ||
+                strpos($checkValue, 'not rated') !== FALSE){
         $array[] = "adult";
-      } elseif (preg_match('/[\d]/', $checkValue) || $checkValue === "education films") {
+      } elseif (preg_match('/[\d]/', $checkValue) ||
+                $checkValue === "education films") {
         $array[] = "juvenile";
       }
     }
+
     $array = array_intersect($terms, $array);
     return $array;
   }

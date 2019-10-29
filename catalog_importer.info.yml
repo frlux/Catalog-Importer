@@ -8,5 +8,3 @@ dependencies:
   - drupal:migrate
   - drupal:migrate_plus
   - drupal:feeds
-  - options
-  - entity_reference

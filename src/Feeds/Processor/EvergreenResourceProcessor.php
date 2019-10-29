@@ -165,9 +165,19 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
    */
   protected function map(FeedInterface $feed, EntityInterface $entity, ItemInterface $item) {
     $mappings = $this->feedType->getMappings();
-    \Drupal::logger('catalog_importer')->notice('Mappings: ', array(
-      '@type' => print_r($mappings, TRUE),
-    ));
+    $preserve = array(
+      'field_resource_audience'=> 1,
+      'field_resource_genre' => 0,
+      'field_catalog'=> 1,
+      'field_resource_isbn' => 0,
+      'title' => 1,
+      'status' => 1,
+      'field_resource_description' => 1,
+      'field_resource_image' => 1,
+      'field_resource_url' => 1,
+      'field_resource_importer_id' => 1,
+      'field_featured_collection' => 0
+    );
 
     // Mappers add to existing fields rather than replacing them. Hence we need
     // to clear target elements of each item before mapping in case we are
@@ -178,14 +188,18 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
         continue;
       }
       
-      unset($entity->{$mapping['target']});
+      //if(!in_array($mapping['target'], array_keys($preserve))){
+        \Drupal::logger('catalog_importer')->notice('Unsetting @field', array(
+          '@field' => print_r($mapping['target'], TRUE),
+        ));
+        unset($entity->{$mapping['target']});
+      //}
     }
 
     // Gather all of the values for this item.
     $source_values = [];
     foreach ($mappings as $mapping) {
       $target = $mapping['target'];
-
       foreach ($mapping['map'] as $column => $source) {
 
         if ($source === '') {
@@ -222,7 +236,12 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
     // Set target values.
     foreach ($mappings as $delta => $mapping) {
       $plugin = $this->feedType->getTargetPlugin($delta);
-      if (isset($field_values[$mapping['target']])) {
+      if (isset($field_values[$mapping['target']])){ //&& !in_array($mapping['target'], array_keys(array_filter($preserve))) ) {
+        //==============================================================================
+        //==============================================================================
+        //NEED TO FIX: clearing of field values for array_keys(array_filter($preserve))
+        //==============================================================================
+        //==============================================================================
         $plugin->setTarget($feed, $entity, $mapping['target'], $field_values[$mapping['target']]);
       }
     }
@@ -241,7 +260,6 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
    *   The state of the clean stage.
    */
   protected function initCleanList(FeedInterface $feed, CleanStateInterface $state) {
-    \Drupal::logger('catalog_importer')->notice('Init cleanList');
     $state->setEntityTypeId($this->entityType());
 
     // Fill the list only if needed.
@@ -303,16 +321,12 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
     } 
     // $update_non_existent = $this->getConfiguration('update_non_existent');
     // \Drupal::logger('catalog_importer')->notice('clean state: @source', array(
-    //   '@source' => $update_non_existent;
+    //   '@source' => $update_non_existent,
     // ));
     // if ($update_non_existent === static::KEEP_NON_EXISTENT) {
     //   // No action to take on this entity.
     //   return;
     // }
-    \Drupal::logger('catalog_importer')->notice('CLEAN: @source', array(
-      '@source' => $entity->id()
-    ));
-    
 
     $fc = $feed->get('field_import_featured_collection')->getValue();
     $entity_ids = array($entity->id());
@@ -327,7 +341,6 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
    * {@inheritdoc}
    */
   public function clear(FeedInterface $feed, StateInterface $state) {
-    \Drupal::logger('catalog_importer')->notice('CLEARR');
     $this->feed_id = $feed->id();
     // Build base select statement.
     $query = $this->queryFactory->get($this->entityType())
@@ -373,10 +386,6 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
          $new_feeds_item[] = $item;
         }
       }
-      \Drupal::logger('catalog_importer')->notice('new feeds: <pre>@type</pre>',
-          array(
-              '@type' => print_r($new_feeds, TRUE),
-          ));
       $new_collections = array();
       foreach($fc as $key=>$featured){
         foreach($collection as $k=>$c){

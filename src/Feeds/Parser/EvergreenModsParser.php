@@ -46,11 +46,10 @@ class EvergreenModsParser extends PluginBase implements ParserInterface {
         $keywords = $this->getItemKeywords($item);
 
         foreach($titleArray as $title){
-          $check = preg_match('/\[(.*)\]/', strtolower($title), $matches);
-          \Drupal::logger('catalog_importer')->notice('regex matched: <pre>@type</pre>',
-          array(
-              '@type' => print_r($matches, TRUE),
-          ));
+          $check = preg_match('/\[(.*)\]/U', strtolower($title), $matches);
+          if($matches && count($matches)> 1){
+            $keywords[] = $matches[1];
+          }
           if(preg_match('/[\xE1\xE9\xED\xF3\xFA\xC1\xC9\xCD\xD3\xDA\xF1\xD1]/', $title)) {
             $keywords[] = "foreign language";
           }

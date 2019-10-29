@@ -81,10 +81,6 @@ class Creators extends Text implements ConfigurableTargetInterface {
       'entity_type' => 'paragraph',
       'bundle' => 'creator',
     ]);
-    \Drupal::logger('catalog_importer')->notice('Paragraphs field_configs: <pre>@type</pre>',
-        array(
-            '@type' => print_r($field_configs, TRUE),
-        )); 
     // $field_options = [];
     // foreach ($field_configs as $field_config) {
     //  // if (in_array($field_config->getType(), ['text', 'text_long', 'text_with_summary'])) {

@@ -39,13 +39,23 @@ use Drupal\feeds\Plugin\Type\PluginBase;
 class EvergreenResourceProcessor extends EntityProcessorBase {
   protected $source_url;
   protected $feed_id;
-  // public function __construct(array $configuration, $plugin_id, array $plugin_definition, EntityTypeManagerInterface $entity_type_manager, QueryFactory $query_factory, EntityTypeBundleInfoInterface $entity_type_bundle_info) {
-  //   \Drupal::logger('catalog_importer')->notice('plugin ID: <pre>@type</pre>',
-  //   array(
-  //       '@type' => print_r($plugin_id, TRUE),
-  //   ));
-  //   parent::__construct( $configuration, $plugin_id, $plugin_definition, $entity_type_manager, $query_factory, $entity_type_bundle_info);
-  // }
+  /**
+   * array containing field ids with previous values that should be preserved as keys and values indicating whether the previous values should be preserved as is (1) or appended to (0)
+   */
+  protected $preserve = array(
+    'field_resource_audience'=> 1,
+    'field_resource_genre' => 1,
+    'field_catalog'=> 1,
+    'field_resource_isbn' => 0,
+    'title' => 1,
+    'status' => 1,
+    'field_resource_description' => 1,
+    'field_resource_image' => 1,
+    'field_resource_url' => 1,
+    'field_resource_importer_id' => 1,
+    'field_featured_collection' => 0,
+    'field_resource_keyword'  => 0,
+  );
 
   /**
    * {@inheritdoc}
@@ -108,6 +118,7 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
       // And... Save! We made it.
       $this->storageController->save($entity);
 
+
       // Track progress.
       $existing_entity_id ? $state->updated++ : $state->created++;
     }
@@ -165,19 +176,6 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
    */
   protected function map(FeedInterface $feed, EntityInterface $entity, ItemInterface $item) {
     $mappings = $this->feedType->getMappings();
-    $preserve = array(
-      'field_resource_audience'=> 1,
-      'field_resource_genre' => 0,
-      'field_catalog'=> 1,
-      'field_resource_isbn' => 0,
-      'title' => 1,
-      'status' => 1,
-      'field_resource_description' => 1,
-      'field_resource_image' => 1,
-      'field_resource_url' => 1,
-      'field_resource_importer_id' => 1,
-      'field_featured_collection' => 0
-    );
 
     // Mappers add to existing fields rather than replacing them. Hence we need
     // to clear target elements of each item before mapping in case we are
@@ -188,12 +186,9 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
         continue;
       }
       
-      //if(!in_array($mapping['target'], array_keys($preserve))){
-        \Drupal::logger('catalog_importer')->notice('Unsetting @field', array(
-          '@field' => print_r($mapping['target'], TRUE),
-        ));
+      if(!in_array($mapping['target'], array_keys($this->preserve))){
         unset($entity->{$mapping['target']});
-      //}
+      } 
     }
 
     // Gather all of the values for this item.
@@ -235,16 +230,48 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
 
     // Set target values.
     foreach ($mappings as $delta => $mapping) {
-      $plugin = $this->feedType->getTargetPlugin($delta);
-      if (isset($field_values[$mapping['target']])){ //&& !in_array($mapping['target'], array_keys(array_filter($preserve))) ) {
-        //==============================================================================
-        //==============================================================================
-        //NEED TO FIX: clearing of field values for array_keys(array_filter($preserve))
-        //==============================================================================
-        //==============================================================================
+      if ( isset($field_values[$mapping['target']]) && !in_array($mapping['target'], array_keys($this->preserve)) ) {
+        $plugin = $this->feedType->getTargetPlugin($delta);
         $plugin->setTarget($feed, $entity, $mapping['target'], $field_values[$mapping['target']]);
+        continue;
       }
+
+      if ( isset($field_values[$mapping['target']]) && !in_array($mapping['target'], array_keys(array_filter($this->preserve))) ) {
+        $multiple = $entity->get($mapping['target'])->getFieldDefinition()->getFieldStorageDefinition()->isMultiple();
+        $field_type = $entity->get($field_name)->getFieldDefinition()->getType();
+        $plugin = $this->feedType->getTargetPlugin($delta);
+
+        $value = !$multiple && $field_type == 'string' ? $entity->get($field_name)->getValue() :  $field_values[$mapping['target']];
+
+        if(!$multiple && $field_type == 'string'){
+          $value[0]['value'] = $value[0]['value'] . " / " . $field_values[$mapping['target']][0]['value'];
+        }
+
+        $plugin->setTarget($feed, $entity, $mapping['target'], $value);
+
+        if(!$multiple){
+          continue;
+        }
+        $values = $entity->get($mapping['target'])->getValue();
+
+        $newValues = array();
+
+        foreach($values as $key => $value){
+          if($key == 0){
+            $newValues[]=$value;
+          } elseif($field_type == 'entity_reference' && !in_array($value['target_id'], array_column($newValues, 'target_id')) ){
+            $newValues[]=$value;
+          } elseif($field_type !== 'entity_reference' && !in_array($value['value'], array_column($newValues, 'value'))){
+            $newValues[]=$value;
+          }
+        }
+        $entity->set($mapping['target'], $newValues);
+        
+      }  
+
     }
+    
+
 
     return $entity;
   }
@@ -278,33 +305,7 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
     $state->total = $state->count();
     $state->progress($state->total, 0);
   }
-  // protected function initCleanList(FeedInterface $feed, CleanStateInterface $state) {
-  //   \Drupal::logger('catalog_importer')->notice('Init cleanList');
-  //   // if(!$this->source_url){
-  //   //   $this->source_url = strtolower($feed->getSource());
-  //   // } 
-  //   // if(!$this->feed_id){
-  //   //   $this->feed_id = $feed->id();
-  //   // } 
-    
-  //   $state->setEntityTypeId($this->entityType());
 
-  //   // Fill the list only if needed.
-  //   if ($this->getConfiguration('update_non_existent') === static::KEEP_NON_EXISTENT) {
-  //     return;
-  //   }
-
-  //   // Set list of entities to clean.
-  //   $ids = $this->queryFactory->get($this->entityType())
-  //     ->condition('feeds_item.target_id', $feed->id())
-  //     ->condition('feeds_item.hash', $this->getConfiguration('update_non_existent'), '<>')
-  //     ->execute();
-  //   $state->setList($ids);
-
-  //   // And set progress.
-  //   $state->total = $state->count();
-  //   $state->progress($state->total, 0);
-  // }
   /**
    * {@inheritdoc}
    */
@@ -314,7 +315,7 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
       $this->source_url = strtolower($feed->getSource());
     } 
     // \Drupal::logger('catalog_importer')->notice('CLEAN: @source', array(
-    //   '@source' => $this->source_url;
+    //   '@source' => $this->source_url,
     // ));
     if(!$this->feed_id){
       $this->feed_id = $feed->id();

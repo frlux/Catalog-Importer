@@ -86,15 +86,17 @@ class ResourceListController extends ItemListController {
         'data' => Html::escape(Unicode::truncate($entity->get('feeds_item')->guid, 30, FALSE, TRUE)),
         'title' => $entity->get('feeds_item')->guid,
       ];
+      $url = $entity->get('feeds_item')->url;
       // Item URL.
       $row[] = [
-        'data' => Link::fromTextAndUrl(Html::escape(Unicode::truncate($entity->get('feeds_item')->url, 30, FALSE, TRUE)), Url::fromUri($entity->get('feeds_item')->url, array(
-          'absolute'    => TRUE,
-          'attributes'  => array(
-            'target'    => '_blank',
-          ),
-        ))),
-        'title' => $entity->get('feeds_item')->url,
+        'data' => !empty($url) ? Link::fromTextAndUrl(Html::escape(Unicode::truncate($url, 30, FALSE, TRUE)),
+                                       Url::fromUri($url, array(
+                                                      'absolute'    => TRUE,
+                                                      'attributes'  => array(
+                                                        'target'    => '_blank',
+                                                      ),
+                                                    ))) : $url,
+        'title' => $url,
       ];
 
       $build['table']['#rows'][] = $row;

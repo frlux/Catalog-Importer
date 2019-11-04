@@ -21,6 +21,7 @@ use Drupal\catalog_importer\Utils\ImporterFunctions;
  */
 class MatchKeywordsToTerms extends TamperBase {
   const SETTING_OPERATION = 'operation';
+  const SETTING_REDUCE = 'reduce';
   public $search;
   
 
@@ -30,6 +31,7 @@ class MatchKeywordsToTerms extends TamperBase {
   public function defaultConfiguration() {
     $config = parent::defaultConfiguration();
     $config[self::SETTING_OPERATION] = 'audience';
+    $config[self::SETTING_OPERATION] = FALSE;
     return $config;
   }
 
@@ -43,6 +45,11 @@ class MatchKeywordsToTerms extends TamperBase {
       '#options' => $this->getOptions(),
       '#default_value' => $this->getSetting(self::SETTING_OPERATION),
     ];
+    $form[self::SETTING_REDUCE] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Return single value'),
+      '#default_value' => $this->getSetting(self::SETTING_REDUCE),
+    ];
 
     return $form;
   }
@@ -53,6 +60,7 @@ class MatchKeywordsToTerms extends TamperBase {
   public function submitConfigurationForm(array &$form, FormStateInterface $form_state) {
     parent::submitConfigurationForm($form, $form_state);
     $this->setConfiguration([self::SETTING_OPERATION => $form_state->getValue(self::SETTING_OPERATION)]);
+    $this->setConfiguration([self::SETTING_REDUCE => $form_state->getValue(self::SETTING_REDUCE)]);
   }
 
   /**
@@ -73,34 +81,46 @@ class MatchKeywordsToTerms extends TamperBase {
    */
   public function tamper($data, TamperableItemInterface $item = NULL) {
     $vocab = $this->getSetting(self::SETTING_OPERATION);
-    $terms = $vocab == 'topic' && !empty($item->feedItem->genre) ? $this->processKeywords($item->feedItem->genre, 'topic') : $this->processKeywords($data, $vocab);
-    if($vocab == 'audience'){
-      return $this->reduceAudience($terms);
-    } elseif($vocab == 'genre' ){
-      return $this->cleanupGenres($terms); 
-    } elseif($vocab == 'topic'){
-      foreach($this->search['topic']['terms'] as $v => $t){
+    $terms = $this->processKeywords($data, $vocab); //$vocab == 'topic' && !empty($item->feedItem->genre) ? $this->processKeywords($item->feedItem->genre, 'topic') : 
+
+    
+    if($vocab == 'genre' ){
+      $terms = $this->cleanupGenres($terms); 
+    } 
+    
+    if(isset($this->search[$vocab]['terms'])){
+      /**
+       * @todo add option when configuring plugin to filter out vocabs from other vocabs
+       * i.e. include other vocab lists in the cache for a vocab.
+       */
+      foreach($this->search[$vocab]['terms'] as $v => $t){
         $terms = is_array($t) ? array_diff($terms, $t) : $terms;
       }
     }
+
+    if($this->getSetting(self::SETTING_REDUCE)){
+      return $this->reduceAudience($terms, $vocab);
+    } 
 
    return array_unique($terms);
   }
 /**
  * Reduces Audience array to 1.
  */
-  public function reduceAudience($audiences){
-    $terms = array_keys($this->search['audience']);
+  public function reduceAudience($audiences, $vocab){
+    $terms = array_keys($this->search[$vocab]); //$terms = array_keys($this->search['audience']);
     $counts = array();
-
+    
     foreach($terms as $term){
       $counts[$term] = 0;
     }
-    $add = array_intersect($terms, $audiences);
-    $check = array_diff($audiences, $terms);
-    $audiences = array_merge($add, $this->checkAudienceKeywords($check, $terms));
     
-
+    if($vocab == 'audience'){
+      $add = array_intersect($terms, $audiences);
+      $check = array_diff($audiences, $terms);
+      $audiences = array_merge($add, $this->checkAudienceKeywords($check, $terms));
+    }
+  
     foreach($audiences as $k => $aud){
       if(isset($counts[$aud])){
         $counts[$aud] = $counts[$aud] + 1;
@@ -120,7 +140,7 @@ class MatchKeywordsToTerms extends TamperBase {
     rsort($audiences);
     
 
-    $audience = count($audiences)>0 ? (string) array_shift($audiences) : 'adult';
+    $audience = count($audiences) > 0 ? (string) array_shift($audiences) : $vocab == 'audience' ? 'adult' : '';
 
     return $audience;
   }
@@ -144,7 +164,6 @@ class MatchKeywordsToTerms extends TamperBase {
  */
   public function lookupTerm($value, $vid) {
     $search = $this->search[$vid];
-    //$value = (string) $value;
 
     $checkValue = trim(strtolower($value), ". / ; , : = \\ ");
     
@@ -269,15 +288,26 @@ class MatchKeywordsToTerms extends TamperBase {
    * Check Additional Audiences
    */
   public function checkAudienceKeywords($values, $terms){
-    if(empty($values)){
-      return array();
-    }
     $array = array();
+    if(empty($values)){
+      return $array;
+    }
+    
     foreach($values as $checkValue){
       if (preg_match('/[0-9]{4}-[0-9]{1,4}/', $checkValue) ||
         preg_match('/[0-9]{4}-$/', $checkValue) ||
         (preg_match('/[0-9]+[t][h]\s/', $checkValue) && strpos($checkValue, 'century') !== FALSE)){
         continue;
+      } elseif(substr($checkValue, -6) == 'and up' || substr($checkValue, -4) == '& up'){
+
+        if(strpos($checkValue, 'grade') !==FALSE){
+          preg_match('/\d+/', $checkValue, $matches);
+          $array[] = empty($matches[0]) || substr($checkValue,0,1) == 'k' ? 'juvenile' : $matches[0] >= 6 ? 'young adult' : 'juvenile';
+          continue;
+        }
+        preg_match('/\d+/', $checkValue, $matches);
+        $array[] = empty($matches[0]) || substr($checkValue,0,1) == 'k' ? 'juvenile' : $matches[0] >= 12 ? 'young adult' : 'juvenile';
+
       } elseif (strpos($checkValue, 'juvenile') !== FALSE ||
         strpos($checkValue, 'school') !== FALSE ||
         strpos($checkValue, "children's ") !== FALSE ||
@@ -298,7 +328,6 @@ class MatchKeywordsToTerms extends TamperBase {
       } elseif (strpos($checkValue, 'grade') !== FALSE ||
                 substr($checkValue,0,3) === 'age' ||
                 strpos($checkValue, ' ages ') !== FALSE ||
-                strpos($checkValue, 'and up') !== FALSE ||
                 substr($checkValue,0,6) === 'infant' ||
                 substr($checkValue,0,4) === 'k to' ||
                 preg_match('/^[0-9]+(-[0-9]+)+$/', $checkValue) ||
@@ -323,7 +352,6 @@ class MatchKeywordsToTerms extends TamperBase {
         $array[] = "juvenile";
       }
     }
-
     $array = array_intersect($terms, $array);
     return $array;
   }

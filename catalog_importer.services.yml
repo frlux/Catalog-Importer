@@ -20,3 +20,8 @@ services:
       - { name: cache.bin }
     factory: cache_factory:get
     arguments: [topicTerms]
+
+  custom_importer.route_subscriber:
+    class: Drupal\catalog_importer\Routing\RouteSubscriber
+    tags:
+      - { name: event_subscriber }

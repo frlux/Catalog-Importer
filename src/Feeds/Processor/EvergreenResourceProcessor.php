@@ -39,14 +39,29 @@ use Drupal\feeds\Plugin\Type\PluginBase;
 class EvergreenResourceProcessor extends EntityProcessorBase {
   protected $source_url;
   protected $feed_id;
-  // public function __construct(array $configuration, $plugin_id, array $plugin_definition, EntityTypeManagerInterface $entity_type_manager, QueryFactory $query_factory, EntityTypeBundleInfoInterface $entity_type_bundle_info) {
-  //   \Drupal::logger('catalog_importer')->notice('plugin ID: <pre>@type</pre>',
-  //   array(
-  //       '@type' => print_r($plugin_id, TRUE),
-  //   ));
-  //   parent::__construct( $configuration, $plugin_id, $plugin_definition, $entity_type_manager, $query_factory, $entity_type_bundle_info);
-  // }
-
+  /**
+   * Array containing field ids with previous values that should be preserved as keys and 
+   * values indicating whether the previous values should be preserved as is (1) or appended to (0)
+   * 
+   * @todo make the configurable via form
+   */
+  protected $preserve = array(
+    'field_resource_audience'=> 1,
+    'field_resource_genre' => 1,
+    'field_catalog'=> 1,
+    'field_resource_isbn' => 0,
+    'title' => 1,
+    'status' => 1,
+    'field_resource_description' => 1,
+    'field_resource_image' => 1,
+    'field_resource_url' => 1,
+    'field_resource_importer_id' => 0,
+    'field_featured_collection' => 0,
+    'field_resource_keyword'  => 0,
+    'feeds_item' => 0,
+    'field_resource_id' => 1,
+  );
+  
   /**
    * {@inheritdoc}
    */
@@ -55,6 +70,9 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
     $clean_state = $feed->getState(StateInterface::CLEAN);
     if (!$clean_state->initiated()) {
       $this->initCleanList($feed, $clean_state);
+    }
+    if(!$this->feed_id){
+      $this->feed_id = $feed->id();
     }
 
     $existing_entity_id = $this->existingEntityId($feed, $item);
@@ -108,6 +126,7 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
       // And... Save! We made it.
       $this->storageController->save($entity);
 
+
       // Track progress.
       $existing_entity_id ? $state->updated++ : $state->created++;
     }
@@ -122,19 +141,19 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
       $state->setMessage($e->getMessage(), 'warning');
     }
   }
-  /**
-   * {@inheritdoc}
-   */
-  public function entityLabel() {
-    return $this->t('Resource');
-  }
+  // /**
+  //  * {@inheritdoc}
+  //  */
+  // public function entityLabel() {
+  //   return $this->t('Resource');
+  // }
 
-  /**
-   * {@inheritdoc}
-   */
-  public function entityLabelPlural() {
-    return $this->t('Resources');
-  }
+  // /**
+  //  * {@inheritdoc}
+  //  */
+  // public function entityLabelPlural() {
+  //   return $this->t('Resources');
+  // }
   /**
    * Bundle type this processor operates on.
    *
@@ -165,19 +184,6 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
    */
   protected function map(FeedInterface $feed, EntityInterface $entity, ItemInterface $item) {
     $mappings = $this->feedType->getMappings();
-    $preserve = array(
-      'field_resource_audience'=> 1,
-      'field_resource_genre' => 0,
-      'field_catalog'=> 1,
-      'field_resource_isbn' => 0,
-      'title' => 1,
-      'status' => 1,
-      'field_resource_description' => 1,
-      'field_resource_image' => 1,
-      'field_resource_url' => 1,
-      'field_resource_importer_id' => 1,
-      'field_featured_collection' => 0
-    );
 
     // Mappers add to existing fields rather than replacing them. Hence we need
     // to clear target elements of each item before mapping in case we are
@@ -188,12 +194,9 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
         continue;
       }
       
-      //if(!in_array($mapping['target'], array_keys($preserve))){
-        \Drupal::logger('catalog_importer')->notice('Unsetting @field', array(
-          '@field' => print_r($mapping['target'], TRUE),
-        ));
+      if(!in_array($mapping['target'], array_keys($this->preserve))){
         unset($entity->{$mapping['target']});
-      //}
+      } 
     }
 
     // Gather all of the values for this item.
@@ -201,7 +204,7 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
     foreach ($mappings as $mapping) {
       $target = $mapping['target'];
       foreach ($mapping['map'] as $column => $source) {
-
+        
         if ($source === '') {
           // Skip empty sources.
           continue;
@@ -236,17 +239,64 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
     // Set target values.
     foreach ($mappings as $delta => $mapping) {
       $plugin = $this->feedType->getTargetPlugin($delta);
-      if (isset($field_values[$mapping['target']])){ //&& !in_array($mapping['target'], array_keys(array_filter($preserve))) ) {
-        //==============================================================================
-        //==============================================================================
-        //NEED TO FIX: clearing of field values for array_keys(array_filter($preserve))
-        //==============================================================================
-        //==============================================================================
+
+      if ( isset($field_values[$mapping['target']]) && !in_array($mapping['target'], array_keys($this->preserve)) ) {
         $plugin->setTarget($feed, $entity, $mapping['target'], $field_values[$mapping['target']]);
+        continue;
+      }
+
+      if ( isset($field_values[$mapping['target']]) && !in_array($mapping['target'], array_keys(array_filter($this->preserve))) ) {
+        // Get information about field config
+        $multiple = $entity->get($mapping['target'])->getFieldDefinition()->getFieldStorageDefinition()->isMultiple();
+        $field_type = $entity->get($mapping['target'])->getFieldDefinition()->getType();
+
+        // If this field can't contain more than one value & is not a string or is a multi-value field,
+        // we'll replace/append the old value with the new.
+        $value = !$multiple && $field_type == 'string' ? $entity->get($mapping['target'])->getValue() :  $field_values[$mapping['target']];
+        // Concatenate string values from old preserved & new update
+        if(!$multiple && $field_type == 'string' && !empty($value)){
+          $value[0]['value'] = $value[0]['value'] . " / " . $field_values[$mapping['target']][0]['value'];
+        }
+
+        $plugin->setTarget($feed, $entity, $mapping['target'], $value);
+
+        if(!$multiple){
+          continue;
+        }
+        $this->removeDuplicateFieldValues($entity,$mapping['target'], $field_type);
+        continue;
+      } 
+
+      if ( isset($field_values[$mapping['target']]) ) {
+        $value = $entity->get($mapping['target']);
+        if($value){
+          $value = $value->getValue();
+        }
+        if(empty($value)){
+          $plugin->setTarget($feed, $entity, $mapping['target'], $field_values[$mapping['target']]);
+        }
       }
     }
-
     return $entity;
+  }
+  /**
+   * Removes duplicate values from entity
+   */
+  protected function removeDuplicateFieldValues($entity, $field, $field_type){
+    $values = $entity->get($field)->getValue();
+
+    $newValues = array();
+
+    foreach($values as $key => $value){
+      if($key == 0){
+        $newValues[]=$value;
+      } elseif($field_type == 'entity_reference' && !in_array($value['target_id'], array_column($newValues, 'target_id')) ){
+        $newValues[]=$value;
+      } elseif($field_type !== 'entity_reference' && !in_array($value['value'], array_column($newValues, 'value'))){
+        $newValues[]=$value;
+      }
+    }
+    $entity->set($field, $newValues);
   }
 /**
    * Initializes the list of entities to clean.
@@ -278,51 +328,20 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
     $state->total = $state->count();
     $state->progress($state->total, 0);
   }
-  // protected function initCleanList(FeedInterface $feed, CleanStateInterface $state) {
-  //   \Drupal::logger('catalog_importer')->notice('Init cleanList');
-  //   // if(!$this->source_url){
-  //   //   $this->source_url = strtolower($feed->getSource());
-  //   // } 
-  //   // if(!$this->feed_id){
-  //   //   $this->feed_id = $feed->id();
-  //   // } 
-    
-  //   $state->setEntityTypeId($this->entityType());
 
-  //   // Fill the list only if needed.
-  //   if ($this->getConfiguration('update_non_existent') === static::KEEP_NON_EXISTENT) {
-  //     return;
-  //   }
-
-  //   // Set list of entities to clean.
-  //   $ids = $this->queryFactory->get($this->entityType())
-  //     ->condition('feeds_item.target_id', $feed->id())
-  //     ->condition('feeds_item.hash', $this->getConfiguration('update_non_existent'), '<>')
-  //     ->execute();
-  //   $state->setList($ids);
-
-  //   // And set progress.
-  //   $state->total = $state->count();
-  //   $state->progress($state->total, 0);
-  // }
   /**
    * {@inheritdoc}
    */
   public function clean(FeedInterface $feed, EntityInterface $entity, CleanStateInterface $state) {
+    // if(!$this->source_url){
+    //   $this->source_url = strtolower($feed->getSource());
+    // } 
     
-    if(!$this->source_url){
-      $this->source_url = strtolower($feed->getSource());
-    } 
-    // \Drupal::logger('catalog_importer')->notice('CLEAN: @source', array(
-    //   '@source' => $this->source_url;
-    // ));
-    if(!$this->feed_id){
-      $this->feed_id = $feed->id();
-    } 
+    // if(!$this->feed_id){
+    //   $this->feed_id = $feed->id();
+    // } 
     // $update_non_existent = $this->getConfiguration('update_non_existent');
-    // \Drupal::logger('catalog_importer')->notice('clean state: @source', array(
-    //   '@source' => $update_non_existent,
-    // ));
+    
     // if ($update_non_existent === static::KEEP_NON_EXISTENT) {
     //   // No action to take on this entity.
     //   return;
@@ -341,10 +360,9 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
    * {@inheritdoc}
    */
   public function clear(FeedInterface $feed, StateInterface $state) {
-    $this->feed_id = $feed->id();
     // Build base select statement.
     $query = $this->queryFactory->get($this->entityType())
-      ->condition('feeds_item.target_id', $feed->id());
+      ->condition('field_resource_importer_id', $feed->id());
 
     // If there is no total, query it.
     if (!$state->total) {
@@ -355,6 +373,9 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
     // Delete a batch of entities.
     $entity_ids = $query->range(0, 10)->execute();
 
+    // This runs if feeds is configured to "delete missing items"
+    // Resource items aren't actually deleted, but removed from bookbag
+    // and references to importer & featured collection are cleaned
     if ($entity_ids) {
       $fc = $feed->get('field_import_featured_collection')->getValue();
       $this->removeFeaturedCollections($entity_ids, $fc);
@@ -362,14 +383,14 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
       $state->progress($state->total, $state->deleted);
     }
   }
-    /**
+  /**
    * {@inheritdoc}
    */
   protected function removeFeaturedCollections(array $entity_ids, $fc) {
 
     $entities = $this->storageController->loadMultiple($entity_ids);
     foreach($entities as $entity){
-      $feeds_item = $entity->get('feeds_item')->getValue();
+      $feeds_item = $entity->get('feeds_item')->getString();
       $feeds= $entity->get('field_resource_importer_id')->getValue();
       $collection= $entity->get('field_featured_collection')->getValue();
 
@@ -380,12 +401,7 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
           $new_feeds[] = $feed;
         }
       }
-      $new_feeds_item = array();
-      foreach($feeds_item as $key => $item){
-        if($item['target_id'] != $this->feed_id){
-         $new_feeds_item[] = $item;
-        }
-      }
+
       $new_collections = array();
       foreach($fc as $key=>$featured){
         foreach($collection as $k=>$c){
@@ -394,12 +410,44 @@ class EvergreenResourceProcessor extends EntityProcessorBase {
           }
         }
       }
-  
-      $entity->set('feeds_item', $new_feeds_item);
+      if($this->feed_id == $feeds_item){
+        unset($entity->feeds_item);
+      }
+
       $entity->set('field_resource_importer_id', $new_feeds);
       $entity->set('field_featured_collection', $new_collections);
       $entity->setNewRevision(FALSE);
       $entity->save();
+    }
+  }
+
+  /**
+   * Returns an existing entity id.
+   *
+   * @param \Drupal\feeds\FeedInterface $feed
+   *   The feed being processed.
+   * @param \Drupal\feeds\Feeds\Item\ItemInterface $item
+   *   The item to find existing ids for.
+   *
+   * @return int|string|null
+   *   The ID of the entity, or null if not found.
+   */
+  protected function existingEntityId(FeedInterface $feed, ItemInterface $item) {
+    foreach ($this->feedType->getMappings() as $delta => $mapping) {
+      if (empty($mapping['unique'])) {
+        continue;
+      }
+      foreach ($mapping['unique'] as $key => $true) {
+        if ($mapping['target'] == 'field_resource_id') {
+          $plugin = $this->feedType->getTargetPlugin($delta);
+          $entity_id = $plugin->getUniqueValue($feed, $mapping['target'], $key, $item->get($mapping['map'][$key]));
+          if ($entity_id) {
+            return $entity_id;
+          }
+        }
+        
+      }
+      
     }
   }
 }

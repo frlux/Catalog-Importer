@@ -1,0 +1,7 @@
+catalog_importer.overview:
+  path: '/admin/config/services/catalog-importer'
+  defaults:
+    _title: 'Catalog Importer Overview'
+    _form: 'Drupal\catalog_importer\Form\ConfigurationForm'
+  requirements:
+    _permission: 'administer site configuration'

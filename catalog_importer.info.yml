@@ -2,6 +2,7 @@ name: Catalog Importer Module
 description: Provides custom import functionality for Fontanalib.
 package: Fontanalib
 type: module
+configure: catalog_importer.overview
 version: 1.0
 core: 8.x
 dependencies:

@@ -1,0 +1,5 @@
+catalog_importer.overview:
+  title: Catalog Importer Configuration
+  description: 'Configure catalog importer settings'
+  route_name: catalog_importer.overview
+  parent: system.admin_config_services

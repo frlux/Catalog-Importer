@@ -1,21 +1,39 @@
 <?php
-
 namespace Drupal\catalog_importer\Utils;
 
 class ImporterFunctions{
+  public static function catalog_importer_rebuild_term_cache($vid){
+     \Drupal::cache('catalog_importer')
+           ->delete($vid);
+     self::catalog_importer_terms_cache($vid);
+  }
+  public static function catalog_importer_rebuild_all_term_caches(){
+    $vocabs = \Drupal::config('catalog_importer.settings')->get('cached_vocabs');
+    foreach($vocabs as $vocab){
+      self::catalog_importer_rebuild_term_cache($vocab);
+    }
+  }
+  public static function catalog_importer_rebuild_term_cache_submit($form, $form_state){
+    $vid = explode("-",$form_state->getTriggeringElement()['#id'])[4];
+    self::catalog_importer_rebuild_term_cache($vid);
+  }
   public static function catalog_importer_terms_cache($vid){
     
-    $bin = $vid . "Terms";
-    $cid = 'catalog_importer:' . \Drupal::languageManager()
-            ->getCurrentLanguage()
-            ->getId();
-     if ($cache = \Drupal::cache($bin)
-       ->get($cid)) {
+    //$cid = $vid //. ": " . \Drupal::languageManager()
+            //->getCurrentLanguage()
+            //->getId();
+     if ($cache = \Drupal::cache('catalog_importer')
+       ->get($vid)) {
+        \Drupal::logger('catalog_importer')->notice('Cache exists for @type',
+        array(
+            '@type' => $vid,
+        ));
        return $cache->data;
-    //   $cache = \Drupal::cache($bin)
-    //   ->deleteAll();
      }
-
+     \Drupal::logger('catalog_importer')->notice('Building new Cache for @type',
+     array(
+         '@type' => $vid,
+     ));
     $terms =\Drupal::entityTypeManager()->getStorage('taxonomy_term')->loadTree($vid); //, 0, NULL, TRUE
     $search = array();
     foreach ($terms as $term) {
@@ -92,8 +110,9 @@ class ImporterFunctions{
       }
 
     }
-    if($vid == "topic"){
-      $resourceVocabs = array('genre', 'audience');
+    $settings = \Drupal::config('catalog_importer.settings')->get('vocab_settings');
+    if(isset($settings[$vid]) && !empty($settings[$vid]['diff'])){
+      $resourceVocabs = array_keys($settings[$vid]['diff']);
 
       foreach($resourceVocabs as $vocab){
         $search['terms'][$vocab] = array();
@@ -104,25 +123,26 @@ class ImporterFunctions{
           $parents[$term->name] = (string) array_shift($term->parents);
         }
       }
-    } else{
-      $tree = array();
-      foreach($search as $name => $info){
-        if($name == 'terms'){
-          continue;
-        }
-        if(isset($info['parent'])){
-          $tree[$info['parent']][] = $name; 
-        }
+    } 
+
+    $tree = array();
+    foreach($search as $name => $info){
+      if($name == 'terms'){
+        continue;
       }
-      if(!empty($tree)){
-        $search['terms']['tree'] = $tree;
+      if(isset($info['parent'])){
+        $tree[$info['parent']][] = $name; 
       }
     }
+    if(!empty($tree)){
+      $search['terms']['catalog_importer_term_tree'] = $tree;
+    }
+
     uasort($search, function($a, $b) {
       return $a['priority'] <=> $b['priority'];
     });
-    \Drupal::cache($bin)
-        ->set($cid, $search);
+    \Drupal::cache('catalog_importer')
+      ->set($vid, $search, \Drupal\Core\Cache\CacheBackendInterface::CACHE_PERMANENT);
     return $search;
   }
 }

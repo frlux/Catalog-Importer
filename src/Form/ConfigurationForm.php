@@ -12,7 +12,6 @@ use Drupal\catalog_importer\Utils\ImporterFunctions;
  * Defines a form that configures forms module settings.
  */
 class ConfigurationForm extends ConfigFormBase {
- 
   /**
    * {@inheritdoc}
    */
@@ -34,7 +33,6 @@ class ConfigurationForm extends ConfigFormBase {
    */
   public function buildForm(array $form, FormStateInterface $form_state, Request $request = NULL) {
     $config = $this->config('catalog_importer.settings');
-    //$state  = \Drupal::state();
 
     $form['#tree'] = TRUE;
     $cached_vocabs = $config->get('cached_vocabs');
@@ -71,14 +69,7 @@ class ConfigurationForm extends ConfigFormBase {
           '#type'  => 'fieldset',
           '#title' => $this->t($vocab . ' settings'),
         );
-        // $form['vocab_settings']['config'][$vocab]['actions']['delete'] = array(
-        //   '#type' => 'button', //'#type' => 'submit',
-        //   '#value' => t('Rebuild ' . $options[$vocab] .' Cache'),
-        //   '#submit' => array('Drupal\catalog_importer\Utils\ImporterFunctions::catalog_importer_rebuild_term_cache'),
-        //   '#prefix' => '<div style="float:right;">',
-        //   '#suffix' => '</div>',
-        //  );
-         //$form['vocab_settings']['actions']['delete_' . $vocab] = array(
+
         $form['vocab_settings']['config'][$vocab]['actions']['delete'] = array(
           '#type' => 'submit',
           '#value' => t('Rebuild ' . $options[$vocab] .' Cache'),
@@ -116,20 +107,19 @@ public function getVocabularies($vids = null){
   public function submitForm(array &$form, FormStateInterface $form_state) {
     $values = $form_state->getValues();
     $config = $this->config('catalog_importer.settings');
-    //$state  = \Drupal::state();
     $vocabs = array();
     
     foreach($values['vocab_settings']['catalog_vocabularies'] as $vocab => $set){
       if(!empty($set)){
         $vocabs[] = $vocab;
+        $vocabulary_entity = Vocabulary::load($vocab);
+        foreach($config->get('keyword_fields') as $field_id => $field_label){
+          catalog_importer_add_term_fields($vocabulary_entity, $field_id, $field_label);
+        }
       }
     } 
     
     if(isset($values['vocab_settings']['config'])){
-      // \Drupal::logger('catalog_importer')->notice('Form values:<br/><pre>@type</pre>',
-      //   array(
-      //       '@type' => print_r($values['vocab_settings']['config'], TRUE),
-      //   ));
       $settings = $values['vocab_settings']['config'];
       foreach($settings as $vocab => &$setting){
         foreach($setting as $name => &$values){
@@ -137,23 +127,14 @@ public function getVocabularies($vids = null){
             $values = array_filter($values);
           }
         }
-        
       }
-      // \Drupal::logger('catalog_importer')->notice('Config:<br/><pre>@type</pre>',
-      //   array(
-      //       '@type' => print_r($settings, TRUE),
-      //   ));
       $config->set('vocab_settings', $settings);
     }
  
     $config->set('cached_vocabs', $vocabs);
     
-    //$settings = $config->get('vocab_settings');
     $config->save();
     return parent::submitForm($form, $form_state);
   }
-  
-
-
  
 }

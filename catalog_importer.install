@@ -1,0 +1,90 @@
+<?php
+
+function catalog_importer_update_8008() {
+  catalog_importer_install();
+  $message = catalog_importer_update_8004();
+  return $message;
+}
+/**
+ * Creates the new field storage configs on update.
+ */
+function catalog_importer_update_8004() {  
+  $keyword_fields = \Drupal::configFactory()->getEditable('catalog_importer.settings')->get('keyword_fields');
+  $message = '';
+  $results = [];
+  foreach($keyword_fields as $field_id => $field_label){
+    $results['field.storage.taxonomy_term'] = _update_or_install_config('field.storage.taxonomy_term');
+  }
+  foreach ($results as $prefix => $result) {
+    $message .= "<br>$prefix:<br>";
+      if(is_array($result)){
+      foreach ($result as $key => $ids) {
+        $message .= "&nbsp;&nbsp;&nbsp;&nbsp; $key: " . implode(', ', $ids) . "<br>";
+      } 
+    } else{
+      $message .= "&nbsp;&nbsp;&nbsp;&nbsp; 1: $result <br>";
+    }
+  }
+  return $message;
+}
+/**
+ * Sets the default Keyword match field names & Ids into configuration
+ */
+function catalog_importer_install() {
+    \Drupal::logger('catalog_importer')->notice('install....');
+  $config = \Drupal::service('config.factory')->getEditable('catalog_importer.settings');
+  $config->set('keyword_fields', array(
+    'field_kw_matches'      => 'Keyword Matches',
+    'field_kw_starts'       => 'Keyword Starts with',
+    'field_kw_ends'         => 'Keyword Ends with',
+    'field_kw_contains'     => 'Keyword Contains',
+    'field_kw_contains_all' => 'Keyword Contains All',
+    'field_kw_priority'     => 'Keyword Processing Priority'
+  ))->save();
+}
+/**
+ * Update or install config entities from config/install files.
+ *
+ * @see \Drupal\config_update\ConfigReverter::import
+ * @see \Drupal\config_update\ConfigReverter::revert
+ *
+ * @param string $prefix
+ *   The prefix for YAML files in find, like 'field.storage.node'
+ */
+function _update_or_install_config($prefix) {
+  $updated = [];
+  $created = [];
+  /** @var \Drupal\Core\Config\ConfigManagerInterface $config_manger */
+  $config_manger = \Drupal::service('config.manager');
+  $files = glob(__DIR__ . '/config/install/' . $prefix . '.*.yml');
+  foreach ($files as $file) {
+    $raw = file_get_contents($file);
+    $value = \Drupal\Component\Serialization\Yaml::decode($raw);
+    if (!is_array($value)) {
+      throw new \RuntimeException(sprintf('Invalid YAML file %s'), $file);
+    }
+    // Lazy hack here since that code ignores the file extension.
+    $type = $config_manger->getEntityTypeIdByName(basename($file));
+    $entity_manager = $config_manger->getEntityManager();
+    $definition = $entity_manager->getDefinition($type);
+    $id_key = $definition->getKey('id');
+    $id = $value[$id_key];
+    /** @var \Drupal\Core\Config\Entity\ConfigEntityStorage $entity_storage */
+    $entity_storage = $entity_manager->getStorage($type);
+    $entity = $entity_storage->load($id);
+    if ($entity) {
+      $entity = $entity_storage->updateFromStorageRecord($entity, $value);
+      $entity->save();
+      $updated[] = $id;
+    }
+    else {
+      $entity = $entity_storage->createFromStorageRecord($value);
+      $entity->save();
+      $created[] = $id;
+    }
+  }
+  return [
+    'updated' => $updated,
+    'created' => $created,
+  ];
+}

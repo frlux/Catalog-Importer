@@ -1,0 +1,69 @@
+<?php
+use Drupal\catalog_importer\Utils\ImporterFunctions;
+use Drupal\taxonomy\Entity\Term;
+use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\taxonomy\VocabularyInterface;
+/**
+ * @file
+ * Contains catalog_importer.module.
+ */
+/**
+ * Implements hook_ENTITY_TYPE_delete() for taxonomy_term entities.
+ */
+function catalog_importer_taxonomy_term_delete(Term $term){
+
+  //ImporterFunctions::catalog_importer_terms_cache($vid)
+
+}
+/**
+ * Implements hook_ENTITY_TYPE_update() for taxonomy_term entities.
+ */
+function catalog_importer_taxonomy_term_update(Term $term){
+  //ImporterFunctions::catalog_importer_terms_cache($vid)
+  
+}
+/**
+ * Adds the default catalog importer term fields to a taxonomy type.
+ *
+ * @param \Drupal\taxonomy\VocabularyInterface $type
+ *   A node type object.
+ * @param string $label
+ *   (optional) The label for the body instance.
+ *
+ * @return \Drupal\field\Entity\FieldConfig
+ *   A Body field object.
+ */
+function catalog_importer_add_term_fields(VocabularyInterface $type, $field_id, $label) {
+  
+     \Drupal::logger('catalog_importer')->notice("catalog_importer_add_term_fields $field_id");
+  // Add or remove the body field, as needed.
+  $field_storage = FieldStorageConfig::loadByName('taxonomy_term', $field_id);
+  $field = FieldConfig::loadByName('taxonomy_term', $type->id(), $field_id);
+  if (empty($field)) {
+    $field = FieldConfig::create([
+      'field_storage' => $field_storage,
+      'bundle' => $type->id(),
+      'label' => $label,
+      'settings' => [
+        'max_length' => 255,
+        'is_ascii'  => false,
+        'case_sensitive'=> false,
+      ],
+    ]);
+    $field->save();
+
+    /** @var \Drupal\Core\Entity\EntityDisplayRepositoryInterface $display_repository */
+    $display_repository = \Drupal::service('entity_display.repository');
+
+    // Assign widget settings for the default form mode.
+    $display_repository->getFormDisplay('taxonomy_term', $type->id())
+      ->setComponent($field_id, [
+        'type' => 'string_textfield',
+      ])
+      ->save();
+
+  }
+
+  return $field;
+}

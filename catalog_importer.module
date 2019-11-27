@@ -12,7 +12,7 @@ use Drupal\taxonomy\VocabularyInterface;
  * Implements hook_ENTITY_TYPE_delete() for taxonomy_term entities.
  */
 function catalog_importer_taxonomy_term_delete(Term $term){
-
+  // @TODO update caches on term cahnges
   //ImporterFunctions::catalog_importer_terms_cache($vid)
 
 }
